@@ -156,9 +156,7 @@ int main(int argc, char ** argv) {
 
 	/* if you wish to see the entire score matrix,
 	 for debug purposes, define DEBUGMATRIX. */
-#ifdef DEBUGMATRIX
-	printMatrix(seqA, seqB, scoreMatrix, sizeA, sizeB);
-#endif
+	//printMatrix(seqA, seqB, scoreMatrix, sizeA, sizeB);
 
 	//print score
 	printf("\nScore: %d\n", score);
