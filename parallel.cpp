@@ -76,12 +76,17 @@ mtype LCS(vector<vector<mtype>> &scoreMatrix, string a, std:: string b, vector<v
 }
 
 int main(int argc, char ** argv) {
+	if(argc < 3){
+		fprintf(stderr, "Necessário arquivos de entrada como argumento\nUso: ./paralelo A.in B.in");
+		exit(1);
+	}	
+
 	string seqA, seqB;
 	
 	string unique;
 
-	seqA = read_seq("fileA.in");
-	seqB = read_seq("fileB.in");
+	seqA = read_seq(argv[1]);
+	seqB = read_seq(argv[2]);
 
 	buildUniqueLetters(seqA, unique);
 	buildUniqueLetters(seqB, unique);

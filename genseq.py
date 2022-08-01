@@ -5,10 +5,14 @@ import sys, random, string
 def random_char(y):
     return ''.join(random.choice(string.ascii_letters) for x in range(y))
 
-f = open(sys.argv[1] + ".in", "x") 
+fA = open(sys.argv[1] + "_A.in", "x") 
+fB = open(sys.argv[1] + "_B.in", "x") 
 
-s = random_char(int(sys.argv[1]))
+sA = random_char(int(sys.argv[1]))
+sB = random_char(int(sys.argv[1]))
 
-f.write(s)
+fA.write(sA)
+fB.write(sB)
 
-f.close()
+fA.close()
+fB.close()

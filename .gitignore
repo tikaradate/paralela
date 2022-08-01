@@ -5,3 +5,5 @@ paper.in
 paper
 seq
 a.cpp
+*.in
+*.out

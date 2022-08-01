@@ -131,6 +131,10 @@ void freeScoreMatrix(mtype **scoreMatrix, int sizeB) {
 }
 
 int main(int argc, char ** argv) {
+	if(argc < 3){
+		fprintf(stderr, "Necessário arquivos de entrada como argumento\nUso: ./paralelo A.in B.in");
+		exit(1);
+	}	
 	// sequence pointers for both sequences
 	char *seqA, *seqB;
 
@@ -138,8 +142,8 @@ int main(int argc, char ** argv) {
 	int sizeA, sizeB;
 
 	//read both sequences
-	seqA = read_seq("fileA.in");
-	seqB = read_seq("fileB.in");
+	seqA = read_seq(argv[1]);
+	seqB = read_seq(argv[2]);
 
 	//find out sizes
 	sizeA = strlen(seqA);
