@@ -18,6 +18,7 @@ typedef unsigned short mtype;
 using std::vector;
 using std::string;
 
+// leitura de arquivos para string
 string read_seq(string file) {
 	std::ifstream t(file);
 	std::stringstream buffer;
@@ -34,7 +35,7 @@ void buildUniqueLetters(string str, string &unique){
 	}
 }
 
-// acha o índice da primeira letra igual ao caracter 'c' na str 'str'
+// acha o índice da primeira letra igual ao caracter 'c' na string 'str'
 int firstEqual(string str, char c){
 	for(int i = 0; i < str.length(); ++i){
 		if(str[i] == c) return i;
@@ -44,7 +45,7 @@ int firstEqual(string str, char c){
 
 // processa a matriz P, a matriz que contém quando determinado caracter de 'bString' foi
 // visto por último, utilizado para tirar a dependência da recorrência principal
-void pMatrix(string unique, string bString, vector<vector<mtype>> &p){
+void calculatePMatrix(string unique, string bString, vector<vector<mtype>> &p){
 	#pragma omp parallel for
 	for(int i = 0; i < unique.length(); ++i){
 		for(int j = 1; j < bString.length()+1; ++j){
@@ -57,12 +58,14 @@ void pMatrix(string unique, string bString, vector<vector<mtype>> &p){
 	}
 }
 
+// calcula o score da maior subsequencia em comum
 mtype LCS(vector<vector<mtype>> &scoreMatrix, string a, std:: string b, vector<vector<mtype>> p, string unique) {
-	for (int i = 1; i < a.length(); i++) {
+	for (int i = 1; i < a.length()+1; i++) {
 		mtype c = firstEqual(unique, a[i-1]);
 		#pragma omp parallel for
-		for (int j = 0; j < b.length(); j++) {
-			// aplica a recursão, utilizando a matriz P
+		for (int j = 0; j < b.length()+1; j++) {
+			// aplica a programação dinâmica utilizando como base a recursão e 
+			// também utilizando a matriz P
 			if(i == 0 || j == 0){
 				scoreMatrix[i][j] = 0;
 			} else if(p[c][j] == 0){
@@ -72,12 +75,22 @@ mtype LCS(vector<vector<mtype>> &scoreMatrix, string a, std:: string b, vector<v
 			}
 		}
 	}
-	return scoreMatrix[a.length()-1][b.length()-1];
+	return scoreMatrix[a.length()][b.length()];
+}
+
+void printMatrix(int n, int m, vector<vector<mtype>> &mat){
+	for(mtype i = 0; i < n; ++i){
+	 	for(mtype j = 0; j < m; ++j){
+	 		std::cout << mat[i][j] << ' ';
+		}
+	 	std::cout << std::endl;
+	}
+	std::cout << std::endl;
 }
 
 int main(int argc, char ** argv) {
 	if(argc < 3){
-		fprintf(stderr, "Necessário arquivos de entrada como argumento\nUso: ./paralelo A.in B.in");
+		fprintf(stderr, "Necessário arquivos de entrada como argumento\nUso: ./paralelo A.in B.in\n");
 		exit(1);
 	}	
 
@@ -91,34 +104,19 @@ int main(int argc, char ** argv) {
 	buildUniqueLetters(seqA, unique);
 	buildUniqueLetters(seqB, unique);
 
-	vector<vector<mtype>> scoreMatrix(seqA.length(), vector<mtype>(seqB.length()));
+	vector<vector<mtype>> scoreMatrix (seqA.length()+1, vector<mtype>(seqB.length()+1));
 
 	vector<vector<mtype>> p (unique.length(), vector<mtype>(seqB.length()+1));
 
-	pMatrix(unique, seqB, p);
+	calculatePMatrix(unique, seqB, p);
 
 	mtype score = LCS(scoreMatrix, seqA, seqB, p, unique);
 
-	/* if you wish to see the entire score matrix,
-	 for debug purposes, define DEBUGMATRIX. */
-	
-	// for(mtype i = 0; i < seqA.length(); ++i){
-	// 	for(mtype j = 0; j < seqB.length(); ++j){
-	// 		std::cout << scoreMatrix[i][j] << ' ';
-	// 	}
-	// 	std::cout << std::endl;
-	// }
-	// std::cout << std::endl;
+	//printMatrix(seqA.length(), seqB.length(), scoreMatrix);
 
-	// for(mtype i = 0; i < unique.length(); ++i){
-	// 	for(mtype j = 0; j < seqB.length(); ++j){
-	// 		std::cout << p[i][j] << ' ';
-	// 	}
-	// 	std::cout << std::endl;
-	// }
+	//printMatrix(unique.length(), seqB.length(), p);
 
-	//prmtype score
-	printf("\nScore: %d\n", score);
+	std::cout << "\nScore: " << score << std::endl;
 
 	return EXIT_SUCCESS;
 }
