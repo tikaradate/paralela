@@ -1,5 +1,5 @@
 # uso: python3 genseq.py (quantidade de caracteres a serem gerados)
-
+# programa auxiliar para a geração de strings aleatórias do tamanho desejado
 import sys, random, string
 
 def random_char(y):
