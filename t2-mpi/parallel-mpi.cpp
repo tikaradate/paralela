@@ -45,22 +45,34 @@ int firstEqual(string str, char c){
 
 // calcula o score da maior subsequencia em comum
 // processa a matriz P, a matriz que contém quando determinado caracter de 'bString' foi
-// visto por último, utilizado para tirar a dependência da recorrência principal
-void calculatePMatrix(string unique, string bString, vector<vector<mtype>> &p){
+void calculatePMatrix(string unique, string bString, mtype *p, int rank, int nrProcs){
 	// #pragma omp parallel for
-	for(int i = 0; i < unique.length(); ++i){
-		for(int j = 1; j < bString.length()+1; ++j){
-			if(bString[j-1] == unique[i]){
-				p[i][j] = j;
+
+	int rows = unique.length();
+	int cols = bString.length()+1;
+
+	int size = rows/nrProcs;
+
+	char stringBuffer[size];
+	mtype matrixBuffer[size*cols];
+
+	MPI_Scatter(unique.c_str(), size, MPI_CHAR, &stringBuffer, size, MPI_CHAR, 0, MPI_COMM_WORLD);
+    MPI_Scatter(p, size*cols, MPI_SHORT, &matrixBuffer, size*cols, MPI_SHORT, 0, MPI_COMM_WORLD);
+
+	for(int i = 0; i < rows; ++i){
+		for(int j = 1; j < cols; ++j){
+			if(bString[j-1] == stringBuffer[i]){
+				matrixBuffer[i*(cols) + j] = j;
 			} else {
-				p[i][j] = p[i][j-1];
+				matrixBuffer[i*(cols) + j] = matrixBuffer[i*(cols) + j-1];
 			}
 		}
 	}
+	
+    MPI_Gather(matrixBuffer, size*cols, MPI_SHORT, p, size*cols, MPI_SHORT, 0, MPI_COMM_WORLD);
 }
 
-// calcula o score da maior subsequencia em comum
-mtype LCS(vector<vector<mtype>> &scoreMatrix, string a, std:: string b, vector<vector<mtype>> p, string unique) {
+mtype LCS(vector<vector<mtype>> &scoreMatrix, string a, std:: string b, mtype *p, string unique) {
 	for (int i = 1; i < a.length()+1; i++) {
 		mtype c = firstEqual(unique, a[i-1]);
 		// #pragma omp parallel for
@@ -69,10 +81,10 @@ mtype LCS(vector<vector<mtype>> &scoreMatrix, string a, std:: string b, vector<v
 			// também utilizando a matriz P
 			if(i == 0 || j == 0){
 				scoreMatrix[i][j] = 0;
-			} else if(p[c][j] == 0){
+			} else if(p[c*(b.length()+1) + j] == 0){
 				scoreMatrix[i][j] = max(scoreMatrix[i-1][j], 0);
 			} else {
-				scoreMatrix[i][j] = max(scoreMatrix[i-1][j], scoreMatrix[i-1][p[c][j]-1] + 1);
+				scoreMatrix[i][j] = max(scoreMatrix[i-1][j], scoreMatrix[i-1][p[c*(b.length()+1) + j]-1] + 1);
 			}
 		}
 	}
@@ -107,9 +119,9 @@ int main(int argc, char ** argv) {
 
 	MPI_Init(&argc, &argv);
 
-	int nr_procs, rank;
+	int nrProcs, rank;
 
-	MPI_Comm_size(MPI_COMM_WORLD, &nr_procs);
+	MPI_Comm_size(MPI_COMM_WORLD, &nrProcs);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
 	// std::cout << rank << std::endl;
@@ -144,33 +156,20 @@ int main(int argc, char ** argv) {
 	MPI_Bcast(const_cast<char*>(seqB.data()), seqSize, MPI_CHAR, 0, MPI_COMM_WORLD);	
 	MPI_Bcast(const_cast<char*>(unique.data()), uniqueSize, MPI_CHAR, 0, MPI_COMM_WORLD);	
 
-	if(rank != 0){
-		// std:: cout <<"rank: "  << rank << " read " << seqA.length() <<  " and "<< seqB.length() << std::endl;
-	}
-
-	// MPI_Finalize();
-
-
-	// return 0;
-
 	vector<vector<mtype>> scoreMatrix (seqA.length()+1, vector<mtype>(seqB.length()+1));
 	// mtype *scoreMatrix = (mtype *) malloc((seqSize+1)*(seqSize+1)*sizeof(mtype));
 
-	vector<vector<mtype>> p (unique.length(), vector<mtype>(seqB.length()+1));
-	// mtype *p = (mtype *) malloc((uniqueSize)*(seqSize+1)*sizeof(mtype));
+	// vector<vector<mtype>> p (unique.length(), vector<mtype>(seqB.length()+1));
+	mtype *p = (mtype *) malloc((uniqueSize)*(seqSize+1)*sizeof(mtype));
 
-	calculatePMatrix(unique, seqB, p);
+	calculatePMatrix(unique, seqB, p, rank, nrProcs);
 
-	// printPMatrix(unique.length(), seqB.length(), p);
-	// MPI_Finalize();
-
-	// return 0;
+	// mtype score = LCS(scoreMatrix, seqA, seqB, p, unique);
 	mtype score = LCS(scoreMatrix, seqA, seqB, p, unique);
-	// }
+	
 	MPI_Finalize();
 
 	//printMatrix(seqA.length(), seqB.length(), scoreMatrix);
-
 
 	std::cout << "\nScore: " << score << std::endl;
 
