@@ -50,13 +50,29 @@ void calculatePMatrix(string unique, string bString, int *p, int rank, int nrPro
 	int size = rows/nrProcs;
 	int remaining = (rows % nrProcs);
 
-	char stringBuffer[size];
-	int matrixBuffer[size*cols];
+	char stringBuffer[(size+1)];
+	int matrixBuffer[(size+1)*cols];
 
-	MPI_Scatter(unique.c_str(), size, MPI_CHAR, stringBuffer, size, MPI_CHAR, 0, MPI_COMM_WORLD);
-    MPI_Scatter(p, size*cols, MPI_INT, matrixBuffer, size*cols, MPI_INT, 0, MPI_COMM_WORLD);
+	int strCounts[nrProcs], strDispls[nrProcs];
+	int pCounts[nrProcs], pDispls[nrProcs];
 
-	for(int i = 0; i < size; ++i){
+	int strInc = 0, pInc = 0;
+	for(int i = 0; i < nrProcs; ++i){
+		strCounts[i] = (i < remaining)? size + 1: size;
+		strDispls[i] = strInc;
+		strInc += strCounts[i];
+
+		pCounts[i] = (i < remaining)? size + 1: size;
+		pCounts[i] *= cols;
+		pDispls[i] = pInc;
+		pInc += pCounts[i];
+	}
+
+	MPI_Scatterv(unique.c_str(), strCounts, strDispls, MPI_CHAR, stringBuffer, strCounts[rank], MPI_CHAR, 0, MPI_COMM_WORLD);
+
+	MPI_Scatterv(p, pCounts, pDispls, MPI_INT, matrixBuffer, pCounts[rank], MPI_INT, 0, MPI_COMM_WORLD);
+
+	for(int i = 0; i < strCounts[rank]; ++i){
 		for(int j = 1; j < cols; ++j){
 			if(bString[j-1] == stringBuffer[i]){
 				matrixBuffer[i*(cols) + j] = j;
@@ -66,19 +82,7 @@ void calculatePMatrix(string unique, string bString, int *p, int rank, int nrPro
 		}
 	}
 	
-    MPI_Gather(matrixBuffer, size*cols, MPI_INT, p, size*cols, MPI_INT, 0, MPI_COMM_WORLD);
-	
-	if (rank == 0){
-        for (int i = rows - remaining ; i < rows; i++){
-            for (int j = 1; j < cols; j++){
-                if (bString[j - 1] == unique[i]){
-                    p[i*cols + j] = j;
-                } else {
-                    p[i*cols + j] = p[i*cols + j - 1];
-                }
-            }
-        }
-    }
+	MPI_Gatherv(matrixBuffer, pCounts[rank], MPI_INT, p, pCounts, pDispls, MPI_INT, 0, MPI_COMM_WORLD);
 }
 
 int LCS(int **scoreMatrix, string a, std:: string b, int *p, string unique, int rank, int nrProcs) {
