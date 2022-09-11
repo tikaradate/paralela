@@ -87,39 +87,32 @@ int LCS(int **scoreMatrix, string a, std:: string b, int *p, string unique, int 
 	
 	int size = cols/nrProcs;
 	int remaining = (cols % nrProcs);
-
-	int start = size*rank;
-	int end = size*rank + size;
 	
 	int scoreBuffer[size];
+	int displs[nrProcs], counts[nrProcs];
 
 	MPI_Bcast(p, (unique.length()*cols), MPI_INT, 0, MPI_COMM_WORLD);
 	for (int i = 1; i < rows; i++) {
 		int c = firstEqual(unique, a[i-1]);
 
-        MPI_Scatter(scoreMatrix[i], size, MPI_INT, scoreBuffer, size, MPI_INT, 0, MPI_COMM_WORLD);
+		int inc = 0;
+		for(int i = 0; i < nrProcs; ++i){
+			counts[i] = (i < remaining)? size + 1 : size;
+			displs[i] = inc;
+			inc += counts[i] ;
+		}
+		MPI_Scatterv(scoreMatrix[i], counts, displs, MPI_INT, scoreBuffer, counts[rank], MPI_INT, 0, MPI_COMM_WORLD);
 
-		for (int j = start; j < end; j++) {
+		for (int j = displs[rank]; j < displs[rank] + counts[rank]; j++) {
 			int pValue = p[c*cols + j];
 			if(pValue == 0){
-				scoreBuffer[j - start] = scoreMatrix[i-1][j];
+				scoreBuffer[j - displs[rank]] = scoreMatrix[i-1][j];
 			} else {
-				scoreBuffer[j - start] = max(scoreMatrix[i-1][j], scoreMatrix[i-1][pValue-1] + 1);
+				scoreBuffer[j - displs[rank]] = max(scoreMatrix[i-1][j], scoreMatrix[i-1][pValue-1] + 1);
 			}
 		}
 
-		MPI_Allgather(scoreBuffer, size, MPI_INT, scoreMatrix[i], size, MPI_INT, MPI_COMM_WORLD);
-
-		if (rank == 0){
-            for (int j = cols - remaining; j < cols; j++){
-                int pValue = p[c*cols + j];
-                if(pValue == 0){
-                    scoreMatrix[i][j] = scoreMatrix[i-1][j];
-                } else {
-                    scoreMatrix[i][j] = max(scoreMatrix[i-1][j], scoreMatrix[i-1][pValue-1] + 1);
-                }
-            }
-        }
+		MPI_Allgatherv(scoreBuffer, counts[rank], MPI_INT, scoreMatrix[i], counts, displs, MPI_INT, MPI_COMM_WORLD);
 	}
 	return scoreMatrix[a.length()][b.length()];
 }
