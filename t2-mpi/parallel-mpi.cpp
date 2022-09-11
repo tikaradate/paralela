@@ -46,22 +46,21 @@ int firstEqual(string str, char c){
 // calcula o score da maior subsequencia em comum
 // processa a matriz P, a matriz que contém quando determinado caracter de 'bString' foi
 void calculatePMatrix(string unique, string bString, mtype *p, int rank, int nrProcs){
-	// #pragma omp parallel for
-
 	int rows = unique.length();
 	int cols = bString.length()+1;
 
 	int size = rows/nrProcs;
+	int remaining = rows % nrProcs;
 
-	char stringBuffer[size];
+	// char stringBuffer[size];
 	mtype matrixBuffer[size*cols];
 
-	MPI_Scatter(unique.c_str(), size, MPI_CHAR, &stringBuffer, size, MPI_CHAR, 0, MPI_COMM_WORLD);
+	// MPI_Scatter(unique.c_str(), size, MPI_CHAR, &stringBuffer, size, MPI_CHAR, 0, MPI_COMM_WORLD);
     MPI_Scatter(p, size*cols, MPI_SHORT, &matrixBuffer, size*cols, MPI_SHORT, 0, MPI_COMM_WORLD);
 
-	for(int i = 0; i < rows; ++i){
+	for(int i = 0; i < size; ++i){
 		for(int j = 1; j < cols; ++j){
-			if(bString[j-1] == stringBuffer[i]){
+			if(bString[j-1] == unique[i]){
 				matrixBuffer[i*(cols) + j] = j;
 			} else {
 				matrixBuffer[i*(cols) + j] = matrixBuffer[i*(cols) + j-1];
@@ -70,6 +69,19 @@ void calculatePMatrix(string unique, string bString, mtype *p, int rank, int nrP
 	}
 	
     MPI_Gather(matrixBuffer, size*cols, MPI_SHORT, p, size*cols, MPI_SHORT, 0, MPI_COMM_WORLD);
+	
+	if (rank == 0){        
+        for (int i = remaining ; i < rows; i++){
+            for (int j = 1; j < cols; j++){
+                if (bString[j - 1] == unique[i]){
+                    p[i*cols + j] = j;
+                } else {
+                    p[i*cols + j] = p[i*cols + j - 1];
+                }
+            }
+        }
+    }
+
 }
 
 mtype LCS(vector<vector<mtype>> &scoreMatrix, string a, std:: string b, mtype *p, string unique) {
