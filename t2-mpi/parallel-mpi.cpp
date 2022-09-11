@@ -84,22 +84,48 @@ void calculatePMatrix(string unique, string bString, mtype *p, int rank, int nrP
 
 }
 
-mtype LCS(vector<vector<mtype>> &scoreMatrix, string a, std:: string b, mtype *p, string unique) {
-	for (int i = 1; i < a.length()+1; i++) {
+mtype LCS(mtype **scoreMatrix, string a, std:: string b, mtype *p, string unique, int rank, int nrProcs) {
+	int rows = a.length()+1;
+	int cols = b.length()+1;
+	
+	int size = cols/nrProcs;
+	int remaining = cols % nrProcs;
+	int start = size*rank;
+	// if(start == 0) start = 1;
+	int end = size*rank + size;
+	int scoreBuffer[size];
+
+	MPI_Bcast(p, (unique.length()*cols), MPI_SHORT, 0, MPI_COMM_WORLD);
+	for (int i = 1; i < rows; i++) {
 		mtype c = firstEqual(unique, a[i-1]);
-		// #pragma omp parallel for
-		for (int j = 0; j < b.length()+1; j++) {
+
+        MPI_Scatter(scoreMatrix[i], size, MPI_SHORT, scoreBuffer, size, MPI_SHORT, 0, MPI_COMM_WORLD);
+
+		for (int j = start; j < end; j++) {
 			// aplica a programação dinâmica utilizando como base a recursão e 
 			// também utilizando a matriz P
-			if(i == 0 || j == 0){
-				scoreMatrix[i][j] = 0;
-			} else if(p[c*(b.length()+1) + j] == 0){
-				scoreMatrix[i][j] = max(scoreMatrix[i-1][j], 0);
+			int pValue = p[c*cols + j];
+			if(pValue == 0){
+				scoreBuffer[j - start] = max(scoreMatrix[i-1][j], 0);
 			} else {
-				scoreMatrix[i][j] = max(scoreMatrix[i-1][j], scoreMatrix[i-1][p[c*(b.length()+1) + j]-1] + 1);
+				scoreBuffer[j - start] = max(scoreMatrix[i-1][j], scoreMatrix[i-1][pValue-1] + 1);
 			}
 		}
+
+		MPI_Allgather(scoreBuffer, size, MPI_SHORT, scoreMatrix[i], size, MPI_SHORT, MPI_COMM_WORLD);
+
+		if (rank == 0){
+            for (int j = remaining; j < cols; j++){
+                int pValue = p[c*cols + j];
+                if(pValue){
+                    scoreMatrix[i][j] = max(scoreMatrix[i-1][j], scoreMatrix[i-1][pValue - 1] + 1);
+                } else {
+                    scoreMatrix[i][j] = scoreMatrix[i-1][j];
+                }
+            }
+        }
 	}
+
 	return scoreMatrix[a.length()][b.length()];
 }
 
@@ -168,8 +194,12 @@ int main(int argc, char ** argv) {
 	MPI_Bcast(const_cast<char*>(seqB.data()), seqSize, MPI_CHAR, 0, MPI_COMM_WORLD);	
 	MPI_Bcast(const_cast<char*>(unique.data()), uniqueSize, MPI_CHAR, 0, MPI_COMM_WORLD);	
 
-	vector<vector<mtype>> scoreMatrix (seqA.length()+1, vector<mtype>(seqB.length()+1));
+	// vector<vector<mtype>> scoreMatrix (seqA.length()+1, vector<mtype>(seqB.length()+1));
 	// mtype *scoreMatrix = (mtype *) malloc((seqSize+1)*(seqSize+1)*sizeof(mtype));
+
+	mtype **scoreMatrix = (mtype **) calloc(seqSize+1, sizeof(mtype *));
+	for(int i = 0; i < seqSize+1; ++i)
+		scoreMatrix[i] = (mtype *) calloc(seqSize+1, sizeof(mtype));
 
 	// vector<vector<mtype>> p (unique.length(), vector<mtype>(seqB.length()+1));
 	mtype *p = (mtype *) malloc((uniqueSize)*(seqSize+1)*sizeof(mtype));
@@ -177,13 +207,14 @@ int main(int argc, char ** argv) {
 	calculatePMatrix(unique, seqB, p, rank, nrProcs);
 
 	// mtype score = LCS(scoreMatrix, seqA, seqB, p, unique);
-	mtype score = LCS(scoreMatrix, seqA, seqB, p, unique);
+	mtype score = LCS(scoreMatrix, seqA, seqB, p, unique, rank, nrProcs);
 	
 	MPI_Finalize();
 
 	//printMatrix(seqA.length(), seqB.length(), scoreMatrix);
 
-	std::cout << "\nScore: " << score << std::endl;
+	if(rank == 0)
+		std::cout << "\nScore: " << score << std::endl;
 
 	return EXIT_SUCCESS;
 }
