@@ -92,7 +92,7 @@ int LCS(int *prevLine, int *currLine, string a, std:: string b, int *p, string u
 	int size = cols/nrProcs;
 	int remaining = (cols % nrProcs);
 	
-	int scoreBuffer[size];
+	int scoreBuffer[size+1];
 	int displs[nrProcs], counts[nrProcs];
 
 	MPI_Bcast(p, (unique.length()*cols), MPI_INT, 0, MPI_COMM_WORLD);
