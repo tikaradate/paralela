@@ -85,7 +85,7 @@ void calculatePMatrix(string unique, string bString, int *p, int rank, int nrPro
 	MPI_Gatherv(matrixBuffer, pCounts[rank], MPI_INT, p, pCounts, pDispls, MPI_INT, 0, MPI_COMM_WORLD);
 }
 
-int LCS(int **scoreMatrix, string a, std:: string b, int *p, string unique, int rank, int nrProcs) {
+int LCS(int *prevLine, int *currLine, string a, std:: string b, int *p, string unique, int rank, int nrProcs) {
 	int rows = a.length()+1;
 	int cols = b.length()+1;
 	
@@ -105,20 +105,24 @@ int LCS(int **scoreMatrix, string a, std:: string b, int *p, string unique, int 
 			displs[i] = inc;
 			inc += counts[i] ;
 		}
-		MPI_Scatterv(scoreMatrix[i], counts, displs, MPI_INT, scoreBuffer, counts[rank], MPI_INT, 0, MPI_COMM_WORLD);
+		MPI_Scatterv(currLine, counts, displs, MPI_INT, scoreBuffer, counts[rank], MPI_INT, 0, MPI_COMM_WORLD);
 
 		for (int j = displs[rank]; j < displs[rank] + counts[rank]; j++) {
 			int pValue = p[c*cols + j];
 			if(pValue == 0){
-				scoreBuffer[j - displs[rank]] = scoreMatrix[i-1][j];
+				scoreBuffer[j - displs[rank]] = prevLine[j];
 			} else {
-				scoreBuffer[j - displs[rank]] = max(scoreMatrix[i-1][j], scoreMatrix[i-1][pValue-1] + 1);
+				scoreBuffer[j - displs[rank]] = max(prevLine[j], prevLine[pValue-1] + 1);
 			}
 		}
 
-		MPI_Allgatherv(scoreBuffer, counts[rank], MPI_INT, scoreMatrix[i], counts, displs, MPI_INT, MPI_COMM_WORLD);
+		MPI_Allgatherv(scoreBuffer, counts[rank], MPI_INT, currLine, counts, displs, MPI_INT, MPI_COMM_WORLD);
+
+		int *tmp = currLine;
+		currLine = prevLine;
+		prevLine = tmp;
 	}
-	return scoreMatrix[a.length()][b.length()];
+	return prevLine[b.length()];
 }
 
 void printMatrix(int n, int m, vector<vector<int>> &mat){
@@ -196,7 +200,7 @@ int main(int argc, char ** argv) {
 
 	calculatePMatrix(unique, seqB, p, rank, nrProcs);
 
-	int score = LCS(scoreMatrix, seqA, seqB, p, unique, rank, nrProcs);
+	int score = LCS(prevLine, currLine, seqA, seqB, p, unique, rank, nrProcs);
 	
 	MPI_Finalize();
 
