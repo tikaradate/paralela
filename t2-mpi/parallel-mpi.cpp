@@ -48,10 +48,11 @@ void calculatePMatrix(string unique, string bString, int *p, int rank, int nrPro
 	int cols = bString.length()+1;
 
 	int size = rows/nrProcs;
+	int matrixSize=  (size+1)*cols;
 	int remaining = (rows % nrProcs);
 
 	char stringBuffer[(size+1)];
-	int matrixBuffer[(size+1)*cols];
+	int *matrixBuffer = (int *) calloc(matrixSize, sizeof(int));
 
 	int strCounts[nrProcs], strDispls[nrProcs];
 	int pCounts[nrProcs], pDispls[nrProcs];
